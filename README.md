@@ -39,6 +39,19 @@
 
 ---
 
+## 📦 已產出的 GT(直接下載,不用重標)
+
+**Scene1 自製 3D 骨架 GT** 已放在 Release:
+- 下載:[scene1_gt.tar.gz](https://github.com/joshua12390902/contest/releases/download/scene1-gt-v1/scene1_gt.tar.gz)(112MB,**5003 instance**,各 30 幀 BODY_25)
+- 表示法:**person-centric**(地板對齊高度 z + 髖線朝向對齊保左右 + 骨盆水平置中)→ 跨場景一致、適合 captioning
+- 解壓到資料集結構:
+```bash
+tar xzf scene1_gt.tar.gz -C PerceptAlign/data/raw/Scene1/
+# 然後 preprocess(GT 已是最終 frame -> 不要加 --apply_scene_transform)
+cd PerceptAlign && PYTHONPATH=$(pwd) python tools/preprocess.py --scene_root data/raw/Scene1 --out_root data/pp
+```
+> Scene2–5 隊友標完,各自跑 `normalize_gt.py` 正規化後同樣可合併。
+
 ## Repo 結構
 ```
 PerceptAlign/               # 官方程式碼（MIT，已內含，不用另外 clone）
