@@ -1,0 +1,19 @@
+# data & weights (never commit — authors' data / large / regenerable)
+PerceptAlign/data/
+PerceptAlign/weights/
+PerceptAlign/outputs/
+**/data/raw/
+*.pt
+*.mat
+*.mp4
+*.csi
+# python
+__pycache__/
+*.pyc
+.venv/
+venv*/
+# secrets — NEVER commit tokens
+*token*
+.env
+# os
+.DS_Store

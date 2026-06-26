@@ -1,0 +1,16 @@
+{
+  "_comment": "Self-made geometry_config for SceneX (single-layout). World frame == OUR frame, so scene_matrix is identity. preprocess does kp@I.T (no-op) then subtracts tx -> everything tx-relative. Units = METERS. Origin = inner corner of taped activity square nearest the TX. +x = TX->RX(far) baseline along floor, +y = left edge of square, +z = up. Fill tx/rx from triangulated antenna tips.",
+  "scene": "Scene1",
+  "tx": [0.00, 0.00, 0.02],
+  "rx": [
+    [0.05, 4.24, 0.02],
+    [4.24, 0.00, 0.02],
+    [1.20, -0.85, 0.02]
+  ],
+  "scene_matrix": [
+    [1.0, 0.0, 0.0, 0.0],
+    [0.0, 1.0, 0.0, 0.0],
+    [0.0, 0.0, 1.0, 0.0],
+    [0.0, 0.0, 0.0, 1.0]
+  ]
+}
