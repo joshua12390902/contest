@@ -133,15 +133,34 @@ def main():
     thigh = np.nanmedian(np.linalg.norm(P3d_m[:,12]-P3d_m[:,14],axis=1))
 
     np.savez(args.out_calib, P1=P1, P2=P2, P3=P3, scale=scale, K=K)
-    # floor plane -> auto tx/rx (placeholder, refine later)
+
+    # ---- floor plane + up direction (z) ----
     feet = P3d_m[:,17:23,:].reshape(-1,3); feet = feet[~np.isnan(feet).any(1)]
     c = feet.mean(0); _,_,Vt = np.linalg.svd(feet-c); n = Vt[-1]
-    e1 = Vt[0]-n*(n@Vt[0]); e1/=np.linalg.norm(e1); e2 = np.cross(n,e1)
-    fp = lambda a,b: (c+a*e1+b*e2).tolist()
-    geom = {"scene": os.path.basename(args.raw), "tx": fp(-2,0.5),
-            "rx": [fp(2,0.8), fp(0,-2), fp(-1.8,1.2)],
-            "scene_matrix": [[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]],
-            "_note": "tx/rx are AUTO floor-plane placeholders; refine by locating real antennas. Model tolerates tx/rx error well."}
+    head = np.nanmedian(P3d_m[:,0], axis=0)
+    footc = np.nanmedian((P3d_m[:,15]+P3d_m[:,16])/2, axis=0)
+    up = n if n @ (head - footc) > 0 else -n          # z = floor normal pointing feet->head
+
+    # ---- tx/rx: AUTO floor-plane PLACEHOLDERS (replace with real antennas!) ----
+    e1 = Vt[0]-up*(up@Vt[0]); e1 /= np.linalg.norm(e1); e2 = np.cross(up, e1)
+    fp = lambda a, b: c + a*e1 + b*e2
+    tx = fp(-2, 0.5); rx = np.array([fp(2, 0.8), fp(0, -2), fp(-1.8, 1.2)])
+
+    # ---- canonical frame (origin=tx, x = tx->rx_centroid on floor, z=up) ----
+    # makes every scene share the SAME axis semantics so multi-scene training is consistent.
+    xax = rx.mean(0) - tx; xax = xax - up*(up@xax); xax /= np.linalg.norm(xax)
+    yax = np.cross(up, xax)
+    R = np.stack([xax, yax, up])                      # rows = canonical axes in cam1 frame
+    sm = np.eye(4); sm[:3, :3] = R                    # preprocess: kp @ sm.T = R@kp ; then -tx
+    geom = {"scene": os.path.basename(args.raw),
+            "tx": (R @ tx).tolist(),
+            "rx": [(R @ r).tolist() for r in rx],     # rel_rx = R@(rx-tx) -> canonical
+            "scene_matrix": sm.tolist(),
+            "_note": ("scene_matrix canonicalizes GT to (origin=tx, x->rx, z=up) so scenes share one "
+                      "axis convention -> required for MULTI-SCENE / cross-scene training. NOTE: tx/rx here "
+                      "are AUTO floor placeholders; the canonical x-axis is only physically consistent across "
+                      "scenes once tx/rx are REAL triangulated antenna positions. Single-scene training does "
+                      "not need this. Replace tx/rx then re-run to finalize.")}
     json.dump(geom, open(args.out_geom, "w"), indent=2)
     print(f"[{args.repo}] ref={args.ref}  reproj={rms:.2f}px  thigh={thigh:.2f}m  scale={scale:.3f}")
     print(f"  -> {args.out_calib} , {args.out_geom}")
