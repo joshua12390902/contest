@@ -45,15 +45,20 @@ PerceptAlign/               # 官方程式碼（MIT，已內含，不用另外 c
   perceptalign/ tools/ configs/ assets/ paper/ LICENSE
 selflabel/
   scripts/
-    detect_2d.py            # 步驟 A：rtmlib RTMW 2D 偵測
-    calibrate_triangulate.py# 步驟 B+C：人體關節自校正 + 三角化
-    make_gt_json.py         # 步驟 D：轉 BODY_25 + 寫 keypoints3d JSON
-    batch_full.py           # 整場景批次（平行下載 + GPU + 自動 QC，可續跑）
-    batch_process.py        # 小批次（沿用校正）
-    calib_lib.py
-  calib_scene1.npz          # Scene1 相機校正（可重用，相機固定）
-  scene1_instances.txt      # Scene1 全 5,868 個 instance 清單（分工用）
-geometry/scene1.json        # Scene1 的 tx/rx geometry_config（scene_matrix=I）
+    detect_2d.py             # 步驟 A：rtmlib RTMW 2D 偵測
+    calibrate_triangulate.py # 步驟 B+C：人體關節自校正 + 三角化（單 instance）
+    calibrate_scene.py       # turnkey：給一個參考 instance → 自動生該場景 calib + geometry
+    enum_scene.py            # 列出某場景所有 instance（含重試）
+    make_gt_json.py          # 步驟 D：轉 BODY_25 + 寫 keypoints3d JSON
+    batch_full.py            # 整場景批次（平行下載 + GPU + 自動 QC，可續跑，吃 SCENE_REPO/SCENE_RAW env）
+    batch_process.py         # 小批次     calib_lib.py
+  calibs/                    # ★ 每場景/佈局的校正（相機不同 → 各一份）
+    calib_scene1.npz  calib_scene2.npz
+    calib_scene3_A.npz  calib_scene3_B.npz  calib_scene3_C.npz   # Scene3 三佈局
+    calib_scene4.npz  calib_scene5.npz
+    geometry_scene*.json     # 對應的 tx/rx（scene_matrix=I，tx/rx 為地板估計可精修）
+  scene1_instances.txt  scene4_instances.txt  scene5_instances.txt
+  # scene2/3 清單用 enum_scene.py 自己生（見下）
 example_gt/1-1-1_keypoints3d/# 一個 instance 的 GT 範例（30 幀 × 25 關節）
 samples/                    # 成果證明圖
 docs/
@@ -99,14 +104,56 @@ PYTHONPATH=$(pwd) python tools/train.py --config configs/<your>.yaml
 
 ---
 
-## 多人分工標註（給隊友）
-Scene1 共 **5,868 個 instance**（`selflabel/scene1_instances.txt`）。要平行標註就把清單切片：
+## 多場景分工（Scene1–5,給隊友認領）
+
+**每個場景相機不同 → 各有自己的校正**（已附在 `selflabel/calibs/`,品質 reproj 2–7px 都驗過）。
+**同一場景內相機固定 → 大家共用該場景的 calib,座標一致、GT 可直接合併。**
+
+| 場景 | HF repo（`SCENE_REPO`） | 校正 | instance 清單 |
+|---|---|---|---|
+| Scene1 | `Atomathtang/Scene1` | `calibs/calib_scene1.npz` | `scene1_instances.txt`（5,868）|
+| Scene2 | `atomathtang11/Scene2` | `calibs/calib_scene2.npz` | 用 enum_scene.py 生 |
+| Scene3-A(user1,2) | `Atomathtang/Scene3` | `calibs/calib_scene3_A.npz` | scene3 中 user1,2 |
+| Scene3-B(user3,4) | `Atomathtang/Scene3` | `calibs/calib_scene3_B.npz` | scene3 中 user3,4 |
+| Scene3-C(user5,6) | `Atomathtang/Scene3` | `calibs/calib_scene3_C.npz` | scene3 中 user5,6 |
+| Scene4 | `atomathtang11/Scene4` | `calibs/calib_scene4.npz` | `scene4_instances.txt`（1,554）|
+| Scene5 | `atomathtang11/Scene5` | `calibs/calib_scene5.npz` | `scene5_instances.txt`（1,684）|
+
+### 隊友認領一個場景怎麼跑
 ```bash
-split -n l/4 selflabel/scene1_instances.txt part_   # 切成 4 份給 4 人
-# 每人:python selflabel/scripts/batch_full.py --instances_file part_aa ...
+export HF_TOKEN=<自己的 HF read token>
+export LD_LIBRARY_PATH=$(python -c "import nvidia.cudnn,os;print(os.path.dirname(nvidia.cudnn.__file__))")/lib:$LD_LIBRARY_PATH
+export SCENE_REPO=atomathtang11/Scene2          # 認領的場景 repo
+export SCENE_RAW=PerceptAlign/data/raw/Scene2   # 本地存放路徑
+
+# (Scene2/3 沒附清單) 先自己生清單：
+python selflabel/scripts/enum_scene.py --repo $SCENE_REPO --out scene2_instances.txt
+
+# 切片給多人 + 跑批次標註（沿用該場景 calib）
+python selflabel/scripts/batch_full.py \
+  --instances_file scene2_instances.txt \
+  --calib selflabel/calibs/calib_scene2.npz \
+  --log scene2.log --workers 12
 ```
-- **Scene1 相機固定 → 大家共用同一份 `calib_scene1.npz`，座標系一致**，產出的 GT 可直接合併。
-- 其他場景（Scene2/3/4/5）相機不同，需**各自重新自校正一次**（每場景跑一次 `calibrate_triangulate.py`）。
+
+### Scene3 三佈局要分開跑（相機/天線每佈局不同）
+```bash
+export SCENE_REPO=Atomathtang/Scene3 SCENE_RAW=PerceptAlign/data/raw/Scene3
+python selflabel/scripts/enum_scene.py --repo $SCENE_REPO --out scene3.txt
+grep -E '^user[12]/' scene3.txt > s3A.txt   # A=user1,2
+grep -E '^user[34]/' scene3.txt > s3B.txt   # B=user3,4
+grep -E '^user[56]/' scene3.txt > s3C.txt   # C=user5,6
+python selflabel/scripts/batch_full.py --instances_file s3A.txt --calib selflabel/calibs/calib_scene3_A.npz --log s3A.log
+python selflabel/scripts/batch_full.py --instances_file s3B.txt --calib selflabel/calibs/calib_scene3_B.npz --log s3B.log
+python selflabel/scripts/batch_full.py --instances_file s3C.txt --calib selflabel/calibs/calib_scene3_C.npz --log s3C.log
+```
+
+### 想換更準的參考校正？
+某場景 calib 若覺得不夠好（reproj 偏大），用 `calibrate_scene.py` 換個動作大的 instance 重生：
+```bash
+python selflabel/scripts/calibrate_scene.py --repo $SCENE_REPO --raw $SCENE_RAW \
+  --ref user1/action11/1-1-1 --out_calib calibs/calib_scene2.npz --out_geom calibs/geometry_scene2.json
+```
 
 ---
 

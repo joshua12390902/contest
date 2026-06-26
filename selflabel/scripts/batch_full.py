@@ -63,11 +63,14 @@ def detect(model, inst_dir):
     for vi, v in enumerate(VIEWS):
         mp4 = glob.glob(os.path.join(inst_dir, v, "*.mp4"))
         if not mp4: continue
-        cap = cv2.VideoCapture(mp4[0]); frames, i = [], 0
+        cap = cv2.VideoCapture(mp4[0])
+        total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 150
+        step = max(1, round(total / NGT))   # adaptive: ~NGT frames regardless of fps
+        frames, i = [], 0
         while True:
             ok, fr = cap.read()
             if not ok: break
-            if i % SUB == 0: frames.append(fr)
+            if i % step == 0: frames.append(fr)
             i += 1
         cap.release()
         for t, fr in enumerate(frames[:NGT]):
