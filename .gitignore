@@ -17,3 +17,6 @@ venv*/
 .env
 # os
 .DS_Store
+
+# run logs
+selflabel/logs/

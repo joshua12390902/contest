@@ -217,7 +217,7 @@ def _compute_metrics(pred: torch.Tensor, gt: torch.Tensor, valid: torch.Tensor) 
     return Metrics(mpjpe_m=float(mpjpe.item()), pck_20=float(pck20.item()), pck_50=float(pck50.item()))
 
 
-def eval_loop(model: torch.nn.Module, loader: DataLoader, device: torch.device, *, amp: bool) -> Metrics:
+def eval_loop(model: torch.nn.Module, loader: DataLoader, device: torch.device, *, amp: bool, use_geometry: bool = True) -> Metrics:
     model.eval()
     mpjpe_sum = 0.0
     p20_sum = 0.0
@@ -240,7 +240,7 @@ def eval_loop(model: torch.nn.Module, loader: DataLoader, device: torch.device, 
                 kp_valid = conf.to(device, non_blocking=True) > 0.0
 
             rel_rx = None
-            if tx is not None and rx is not None:
+            if use_geometry and tx is not None and rx is not None:
                 tx = tx.to(device, non_blocking=True)
                 rx = rx.to(device, non_blocking=True)
                 rel_rx = rx - tx.unsqueeze(1)
@@ -335,7 +335,9 @@ def main() -> None:
     state = torch.load(args.checkpoint, map_location=device)
     model.load_state_dict(state, strict=True)
 
-    m = eval_loop(model, dl, device, amp=bool(args.amp))
+    use_geometry = bool(cfg["model"].get("use_geometry", True))
+    print(f"[model] use_geometry(rel_rx conditioning)={use_geometry}")
+    m = eval_loop(model, dl, device, amp=bool(args.amp), use_geometry=use_geometry)
     print(f"[{args.split}] MPJPE={m.mpjpe_m*1000:.2f} mm | PCK@20={m.pck_20*100:.2f}% | PCK@50={m.pck_50*100:.2f}%")
 
 

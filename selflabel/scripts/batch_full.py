@@ -182,7 +182,7 @@ def main():
             print(f"[{k+1}/{len(pending)}] acc={acc} rej={rej} err={err} "
                   f"{rate:.2f} inst/s ETA {(len(pending)-k-1)/max(rate,0.01)/3600:.1f}h", flush=True)
     done = skip
-    lg.write(f"# SUMMARY acc={acc} rej={rej} err={err} skip={done} of {len(insts)}\n"); lg.flush()
+    lg.write(f"# SUMMARY acc={acc} rej={rej} err={err} skip={done} of {len(allinsts)}\n"); lg.flush()
     print(f"DONE acc={acc} rej={rej} err={err} skip={done}", flush=True)
 
 
