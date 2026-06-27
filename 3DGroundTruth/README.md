@@ -22,9 +22,14 @@
 | Scene | instances | 狀態 |
 |---|---|---|
 | Scene1 | 5003 | ✅ 完成 |
-| Scene2 | — | ⏳ 待標（訓練用）|
-| Scene3 A/B/C | — | ⏳ 待標（訓練用）|
-| Scene4 / Scene5 | — | ⏳ 待標（**test-only**，論文 §6.6：train 1-3 → test 4/5）|
+| Scene2 | 4425 | ✅ 完成（訓練用）|
+| Scene3 A/B/C | 3142 | ✅ 完成（訓練用，A=1093 B=1065 C=984）|
+| Scene4 | 1536 | ✅ 完成（**test-only**，論文 §6.6：train 1-3 → test 4/5）|
+| Scene5 | 1678 | ✅ 完成（**test-only**）|
+
+> 全 Scene1–5 共 ~15,784 instances。Scene3/4/5 使用穩健多位置校正
+> （`selflabel/scripts/calibrate_scene_multi.py`，每 layout 跨 5 個地板位置自校正，
+> reproj 1.7–4.6px）；Scene3 calib 修復前的單位置版本只在 location 1 有效。
 
 ## 拿來訓練（展開回 preprocess 結構）
 ```bash

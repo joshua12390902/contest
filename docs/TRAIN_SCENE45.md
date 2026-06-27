@@ -43,14 +43,18 @@ cd PerceptAlign
 PY=/home/pairlab/sim-evals/.venv/bin/python
 PYTHONPATH=$(pwd) $PY tools/preprocess.py --scene_root data/train_subset/Scene4 \
   --out_root data/preprocessed_actions --scene_name Scene4 \
-  --geometry_json ../selflabel/calibs/geometry_scene4.json --apply_scene_transform
+  --geometry_json ../selflabel/calibs/geometry_scene4.json
 PYTHONPATH=$(pwd) $PY tools/preprocess.py --scene_root data/train_subset/Scene5 \
   --out_root data/preprocessed_actions --scene_name Scene5 \
-  --geometry_json ../selflabel/calibs/geometry_scene5.json --apply_scene_transform
+  --geometry_json ../selflabel/calibs/geometry_scene5.json
 ```
 
-`--apply_scene_transform` 因 `scene_matrix=I` → 等於把 keypoints 減去 tx,轉成 **tx-relative**(模型期望的輸入座標)。
-tx/rx 也會一併寫進 .pt,訓練時 train.py 算 `rel_rx = rx - tx` 當幾何條件。
+⚠️ **不要加 `--apply_scene_transform`**:共享 GT(`3DGroundTruth/`)已經是最終 **person-centric** frame
+(`normalize_gt.py` 做過:z=離地高度、x=左右髖、y=前後、原點=骨盆),再減 tx 會破壞它。
+`--geometry_json` 仍要給 → tx/rx 會寫進 .pt,訓練時 train.py 算 `rel_rx = rx - tx` 當幾何條件。
+
+> 若是從乾淨的 `3DGroundTruth/` 起跑(本機 data/raw 已被 normalize 過,可跳過):
+> `python selflabel/scripts/unpack_gt.py --gt_dir 3DGroundTruth/Scene4 --scene_root PerceptAlign/data/raw/Scene4`
 
 ## 3. 訓練(三個 protocol)
 
@@ -58,7 +62,7 @@ tx/rx 也會一併寫進 .pt,訓練時 train.py 算 `rel_rx = rx - tx` 當幾何
 |---|---|---|---|
 | `cross_subject_scene4_leave1.yaml` | Scene4:train user2+3 / test user1 | 同場景、未見受試者泛化 | ✅(同一座標系) |
 | `cross_subject_scene5_leave1.yaml` | Scene5:同上 | 同上 | ✅ |
-| `cross_scene_train4_test5.yaml` | train Scene4 / test Scene5 | 跨場景 | ⚠️ 兩場景各自獨立自校正、座標系未對齊 → 絕對值不可比,只看相對趨勢 |
+| `cross_scene_train4_test5.yaml` | train Scene4 / test Scene5 | 跨場景 | ✅ person-centric frame 跨場景一致(z=離地、x=左右髖)→ 絕對 MPJPE 現在可比;這正是 person-centric 表示法的目的 |
 
 ```bash
 PYTHONPATH=$(pwd) $PY tools/train.py --config configs/cross_subject_scene4_leave1.yaml --device cuda:0
