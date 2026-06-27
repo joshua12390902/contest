@@ -1,0 +1,20 @@
+# 論文版設定 + 全 Scene1 + person-centric GT（geometry 關，因無真實 tx/rx）
+experiment: {name: scene1_paper_full, seed: 42}
+paths:
+  preprocessed_root: data/pp_full
+  manifest: data/pp_full/manifest.json
+  weights_dir: weights
+  outputs_dir: outputs
+model: {num_keypoints: 25, num_layers: 6, num_heads: 8, pos_enc_depth: 10, max_seq_len: 120, use_geometry: false}
+data: {batch_size: 4, num_workers: 4, amp: true}
+train:
+  epochs: 200
+  lr: 1.0e-4
+  min_lr: 1.0e-6
+  weight_decay: 1.0e-5
+  grad_accum: 16          # batch 4 x 16 = effective 64 (paper)
+  val_ratio: 0.1
+  optimizer: adam         # paper: Adam
+  lr_schedule: cosine     # paper: cosine 1e-4 -> 1e-6
+  loss: mse               # paper: MSE
+protocol: {type: per_scene, scene: Scene1, test_ratio: 0.2}

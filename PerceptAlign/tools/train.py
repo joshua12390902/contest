@@ -149,6 +149,20 @@ def _select_by_protocol(items: List[dict], cfg: dict) -> Tuple[List[dict], List[
         test_set = [x for x in scene_items if x.get("user") == test_user]
         return train_pool, test_set
 
+    if ptype == "per_scene":
+        # in-domain 80/20 random split by instance within a scene (paper §5.4 Per-scene)
+        scene = proto["scene"]
+        test_ratio = float(proto.get("test_ratio", 0.2))
+        items_s = [x for x in items if x.get("scene") == scene]
+        r = random.Random(int(cfg["experiment"]["seed"]))
+        idx = list(range(len(items_s))); r.shuffle(idx)
+        n_test = int(round(len(items_s) * test_ratio))
+        test_set = [items_s[i] for i in idx[:n_test]]
+        train_pool = [items_s[i] for i in idx[n_test:]]
+        if int(os.environ.get("RANK", "0")) == 0:
+            print(f"[protocol] per_scene {scene} 80/20: train_pool={len(train_pool)} test={len(test_set)}")
+        return train_pool, test_set
+
     raise ValueError(f"Unknown protocol.type: {ptype}")
 
 
@@ -408,14 +422,23 @@ def main() -> None:
     if _ddp_is_enabled():
         model = DDP(model, device_ids=[local_rank] if device.type == "cuda" else None, find_unused_parameters=True)
 
-    criterion = nn.SmoothL1Loss(reduction="none").to(device)
-    optimizer = torch.optim.AdamW(
+    _loss = str(cfg["train"].get("loss", "smoothl1")).lower()
+    criterion = (nn.MSELoss(reduction="none") if _loss == "mse" else nn.SmoothL1Loss(reduction="none")).to(device)
+    _opt = str(cfg["train"].get("optimizer", "adamw")).lower()
+    _OptCls = torch.optim.Adam if _opt == "adam" else torch.optim.AdamW
+    optimizer = _OptCls(
         model.parameters(), lr=float(cfg["train"]["lr"]), weight_decay=float(cfg["train"]["weight_decay"])
     )
     scaler = torch.cuda.amp.GradScaler(enabled=(amp and device.type == "cuda"))
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode="min", factor=0.5, patience=10, min_lr=1e-7
-    )
+    _sched = str(cfg["train"].get("lr_schedule", "plateau")).lower()
+    if _sched == "cosine":
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=int(cfg["train"]["epochs"]), eta_min=float(cfg["train"].get("min_lr", 1e-6))
+        )
+    else:
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer, mode="min", factor=0.5, patience=10, min_lr=1e-7
+        )
 
     exp_name = str(cfg["experiment"]["name"])
     best_path = os.path.join(weights_dir, f"{exp_name}_best.pth")
@@ -481,7 +504,7 @@ def main() -> None:
         # Validation on rank0
         if rank == 0:
             m = _eval_loop(model.module if isinstance(model, DDP) else model, dl_val, device, amp=amp, use_geometry=use_geometry)
-            scheduler.step(m.mpjpe_m)
+            scheduler.step() if _sched == "cosine" else scheduler.step(m.mpjpe_m)
             lr = optimizer.param_groups[0]["lr"]
             print(
                 f"[epoch {epoch+1}/{epochs}] val: MPJPE={m.mpjpe_m*1000:.2f}mm "

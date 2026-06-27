@@ -1,0 +1,7 @@
+# in-domain 80/20 quick run (repo 預設 SmoothL1/AdamW/Plateau)
+experiment: {name: scene1_indomain_8020, seed: 42}
+paths: {preprocessed_root: data/pp_subset, manifest: data/pp_subset/manifest.json, weights_dir: weights, outputs_dir: outputs}
+model: {num_keypoints: 25, num_layers: 4, num_heads: 8, pos_enc_depth: 10, max_seq_len: 120, use_geometry: false}
+data: {batch_size: 2, num_workers: 2, amp: true}
+train: {epochs: 40, lr: 1.0e-4, weight_decay: 0.01, grad_accum: 8, val_ratio: 0.1}
+protocol: {type: per_scene, scene: Scene1, test_ratio: 0.2}
