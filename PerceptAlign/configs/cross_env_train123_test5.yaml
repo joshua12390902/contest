@@ -1,0 +1,35 @@
+experiment:
+  name: cross_env_train123_test5
+  seed: 42
+
+# Cross-ENVIRONMENT: train on Scene1+2+3, test on Scene5 (unseen room).
+paths:
+  preprocessed_root: /home/pairlab/contest/PerceptAlign/data/preprocessed_actions
+  manifest: /home/pairlab/contest/PerceptAlign/data/preprocessed_actions/manifest.json
+  weights_dir: /home/pairlab/contest/PerceptAlign/weights
+  outputs_dir: /home/pairlab/contest/PerceptAlign/outputs
+
+model:
+  num_keypoints: 25
+  num_layers: 4
+  num_heads: 8
+  pos_enc_depth: 10
+  max_seq_len: 120
+  use_geometry: true
+
+data:
+  batch_size: 4
+  num_workers: 4
+  amp: true
+
+train:
+  epochs: 60
+  lr: 1.0e-4
+  weight_decay: 0.01
+  grad_accum: 4
+  val_ratio: 0.1
+
+protocol:
+  type: cross_scene
+  train_scenes: [Scene1, Scene2, Scene3]
+  test_scene: Scene5
