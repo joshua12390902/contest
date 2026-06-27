@@ -253,6 +253,7 @@ def _eval_loop(
     device: torch.device,
     *,
     amp: bool,
+    use_geometry: bool = True,
 ) -> Metrics:
     model.eval()
     mpjpe_sum = 0.0
@@ -279,7 +280,7 @@ def _eval_loop(
                 kp_valid = conf.to(device, non_blocking=True) > 0.0
 
             rel_rx = None
-            if tx is not None and rx is not None:
+            if use_geometry and tx is not None and rx is not None:
                 tx = tx.to(device, non_blocking=True)
                 rx = rx.to(device, non_blocking=True)
                 rel_rx = rx - tx.unsqueeze(1)
@@ -391,6 +392,9 @@ def main() -> None:
     )
 
     # Default receiver coords for initialization (actual per-sample rel_rx will be passed if available)
+    use_geometry = bool(cfg["model"].get("use_geometry", True))
+    if rank == 0:
+        print(f"[model] use_geometry(rel_rx conditioning)={use_geometry}")
     rel_rx_default = torch.zeros((3, 3), dtype=torch.float32)
     model = posenet(
         num_keypoints=int(cfg["model"]["num_keypoints"]),
@@ -447,7 +451,7 @@ def main() -> None:
                 kp_valid = conf.to(device, non_blocking=True) > 0.0
 
             rel_rx = None
-            if tx is not None and rx is not None:
+            if use_geometry and tx is not None and rx is not None:
                 tx = tx.to(device, non_blocking=True)
                 rx = rx.to(device, non_blocking=True)
                 rel_rx = rx - tx.unsqueeze(1)
@@ -476,7 +480,7 @@ def main() -> None:
 
         # Validation on rank0
         if rank == 0:
-            m = _eval_loop(model.module if isinstance(model, DDP) else model, dl_val, device, amp=amp)
+            m = _eval_loop(model.module if isinstance(model, DDP) else model, dl_val, device, amp=amp, use_geometry=use_geometry)
             scheduler.step(m.mpjpe_m)
             lr = optimizer.param_groups[0]["lr"]
             print(

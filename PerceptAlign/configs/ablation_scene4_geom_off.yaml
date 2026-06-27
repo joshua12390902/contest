@@ -1,0 +1,34 @@
+experiment:
+  name: ablation_scene4_geom_off
+  seed: 42
+
+paths:
+  preprocessed_root: data/preprocessed_actions
+  manifest: data/preprocessed_actions/manifest.json
+  weights_dir: weights
+  outputs_dir: outputs
+
+model:
+  num_keypoints: 25
+  num_layers: 4
+  num_heads: 8
+  pos_enc_depth: 10
+  max_seq_len: 120
+  use_geometry: false     # rel_rx geometry conditioning OFF (ablation baseline)
+
+data:
+  batch_size: 2
+  num_workers: 4
+  amp: true
+
+train:
+  epochs: 200
+  lr: 1.0e-4
+  weight_decay: 0.01
+  grad_accum: 8
+  val_ratio: 0.1
+
+protocol:
+  type: cross_subject
+  scene: Scene4
+  test_user: user1
