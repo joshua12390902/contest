@@ -50,6 +50,12 @@ tar xzf scene1_gt.tar.gz -C PerceptAlign/data/raw/Scene1/
 # 然後 preprocess(GT 已是最終 frame -> 不要加 --apply_scene_transform)
 cd PerceptAlign && PYTHONPATH=$(pwd) python tools/preprocess.py --scene_root data/raw/Scene1 --out_root data/pp
 ```
+
+**Scene2 自製 3D 骨架 GT** 已放在 Release:
+- 下載:[scene2_gt.tar.gz](https://github.com/314834007-learn/contest/releases/download/scene2-gt-v1/scene2_gt.tar.gz)(101MB,**4425 instance**,各 30 幀 BODY_25;QC 通過率 89.6%)
+- 表示法:**person-centric**(同 Scene1,跨場景一致)
+- 解壓:`tar xzf scene2_gt.tar.gz -C PerceptAlign/data/raw/Scene2/`,然後 preprocess **不要加** `--apply_scene_transform`(GT 已是最終 frame)
+
 > Scene2–5 隊友標完,各自跑 `normalize_gt.py` 正規化後同樣可合併。
 
 ## Repo 結構
